@@ -1,5 +1,7 @@
 import * as Sentry from '@sentry/react-native';
 import { init as sentryExpoInit } from 'sentry-expo';
+import React from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 
 export interface SentryConfig {
   dsn: string;
@@ -464,11 +466,20 @@ export function createNavigationIntegration() {
 export function withSentryErrorBoundary<P>(Component: React.ComponentType<P>) {
   return Sentry.withErrorBoundary(Component, {
     fallback: ({ error, resetError }) => (
-      <div style={{ padding: 20, textAlign: 'center' }}>
-        <h2>Something went wrong</h2>
-        <p>An error occurred and has been reported.</p>
-        <button onClick={resetError}>Try again</button>
-      </div>
+      <View style={{ padding: 20, alignItems: 'center', justifyContent: 'center', flex: 1 }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: 'white', marginBottom: 10 }}>
+          Something went wrong
+        </Text>
+        <Text style={{ color: '#9CA3AF', marginBottom: 20, textAlign: 'center' }}>
+          An error occurred and has been reported.
+        </Text>
+        <TouchableOpacity
+          onPress={resetError}
+          style={{ backgroundColor: '#DC2626', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+        >
+          <Text style={{ color: 'white', fontWeight: '600' }}>Try again</Text>
+        </TouchableOpacity>
+      </View>
     ),
     beforeCapture: (scope, error, errorInfo) => {
       scope.setTag('error_boundary', 'react');

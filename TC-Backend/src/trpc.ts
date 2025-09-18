@@ -2,6 +2,12 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import { ZodError } from 'zod';
 import { Context, requireAuth } from './context';
+import { RateLimitMiddleware } from './middleware/auth/rate-limit.middleware';
+import Redis from 'ioredis';
+
+// Initialize Redis and Rate Limiting
+const redis = new Redis(process.env.REDIS_URL!);
+const rateLimiter = new RateLimitMiddleware(redis);
 
 // Initialize tRPC with context
 const t = initTRPC.context<Context>().create({
@@ -77,14 +83,47 @@ export const adminProcedure = t.procedure.use(async ({ ctx, next }) => {
 });
 
 /**
- * Rate limited procedure (can be combined with other middlewares)
+ * Rate limited procedure for auth endpoints
  */
 export const rateLimitedProcedure = t.procedure.use(async ({ ctx, next }) => {
-  // Rate limiting logic would go here
-  // For now, just pass through
-  // TODO: Implement Redis-based rate limiting
+  try {
+    // Apply general API rate limiting
+    const generalRateLimit = rateLimiter.createRateLimiter('api.general');
+    await generalRateLimit(ctx.req as any, {} as any);
 
-  return next();
+    return next();
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Rate limit exceeded',
+    });
+  }
+});
+
+/**
+ * Auth-specific rate limited procedure
+ */
+export const authRateLimitedProcedure = t.procedure.use(async ({ ctx, next }) => {
+  try {
+    // Apply auth-specific rate limiting
+    const authRateLimit = rateLimiter.createRateLimiter('auth.signIn');
+    await authRateLimit(ctx.req as any, {} as any);
+
+    return next();
+  } catch (error) {
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+
+    throw new TRPCError({
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many authentication attempts',
+    });
+  }
 });
 
 // Custom middleware for logging

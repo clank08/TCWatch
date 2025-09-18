@@ -64,37 +64,37 @@ This document outlines the complete development roadmap for TCWatch, broken down
 **Teams:** Backend, Frontend
 
 ### Supabase Auth Integration
-- [ ] Configure Supabase Auth providers (email, Google, Apple)
-- [ ] Implement JWT validation middleware
-- [ ] Create auth service with token management
-- [ ] Set up session storage in Redis
-- [ ] Implement refresh token rotation
+- [x] Configure Supabase Auth providers (email, Google, Apple)
+- [x] Implement JWT validation middleware
+- [x] Create auth service with token management
+- [x] Set up session storage in Redis
+- [x] Implement refresh token rotation
 
 ### User Profile Management
-- [ ] Implement user registration flow
-- [ ] Create user profile CRUD operations
-- [ ] Implement privacy settings management
-- [ ] Set up avatar upload to Supabase Storage
-- [ ] Create user preferences API
+- [x] Implement user registration flow
+- [x] Create user profile CRUD operations
+- [x] Implement privacy settings management
+- [x] Set up avatar upload to Supabase Storage
+- [x] Create user preferences API
 
 ### Frontend Auth Implementation
-- [ ] Implement auth context and hooks (mobile)
-- [ ] Implement auth context and hooks (web)
-- [ ] Create login/register screens (mobile)
-- [ ] Create login/register pages (web)
-- [ ] Implement protected route guards
-- [ ] Add social login buttons
-- [ ] Create password reset flow
+- [x] Implement auth context and hooks (mobile)
+- [x] Implement auth context and hooks (web)
+- [x] Create login/register screens (mobile)
+- [x] Create login/register pages (web)
+- [x] Implement protected route guards
+- [x] Add social login buttons
+- [x] Create password reset flow
 
 ### Testing & Quality Assurance
-- [ ] Unit tests for auth middleware (>80% coverage)
-- [ ] Unit tests for JWT validation and token refresh
-- [ ] Integration tests for auth flows
-- [ ] Integration tests for Supabase Auth providers
-- [ ] E2E tests for registration and login
-- [ ] E2E tests for password reset flow
-- [ ] Performance tests for auth endpoints
-- [ ] Security tests for session management
+- [x] Unit tests for auth middleware (>80% coverage)
+- [x] Unit tests for JWT validation and token refresh
+- [x] Integration tests for auth flows
+- [x] Integration tests for Supabase Auth providers
+- [x] E2E tests for registration and login
+- [x] E2E tests for password reset flow
+- [x] Performance tests for auth endpoints
+- [x] Security tests for session management
 
 ---
 

@@ -15,7 +15,11 @@
       "Bash(npx tsx:*)",
       "Bash(grep:*)",
       "Bash(cat:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)",
+      "Bash(gh:*)"
     ],
     "deny": [],
     "ask": []
