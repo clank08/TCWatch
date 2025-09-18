@@ -1,0 +1,65 @@
+# Temporal Dynamic Configuration for Development
+# This file configures Temporal server behavior for local development
+
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}
+
+frontend.enableUpdateWorkflowExecution:
+  - value: true
+    constraints: {}
+
+system.enableEagerWorkflowStart:
+  - value: true
+    constraints: {}
+
+system.enableCrossNamespaceCommands:
+  - value: true
+    constraints: {}
+
+frontend.enableExecuteMultiOperation:
+  - value: true
+    constraints: {}
+
+# Workflow execution settings
+frontend.maxConcurrentWorkflowTaskExecutionSize:
+  - value: 1000
+    constraints: {}
+
+frontend.maxConcurrentActivityExecutionSize:
+  - value: 1000
+    constraints: {}
+
+# Retention settings for development
+system.defaultWorkflowRetentionTtl:
+  - value: "72h"
+    constraints: {}
+
+# History settings
+system.historyMaxAutoResetPoints:
+  - value: 20
+    constraints: {}
+
+# Worker settings
+worker.buildIdScavengerEnabled:
+  - value: true
+    constraints: {}
+
+# Matching settings
+matching.forwarderMaxOutstandingPolls:
+  - value: 1
+    constraints: {}
+
+matching.forwarderMaxOutstandingTasks:
+  - value: 1
+    constraints: {}
+
+# Development-specific settings
+frontend.enableServerVersionCheck:
+  - value: false
+    constraints: {}
+
+# Visibility settings
+system.advancedVisibilityWritingMode:
+  - value: "dual"
+    constraints: {}

@@ -1,0 +1,483 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Used for migrations when connection pooling is enabled
+}
+
+// User profiles (extends Supabase auth.users)
+model UserProfile {
+  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  displayName     String?  @map("display_name") @db.VarChar(100)
+  avatarUrl       String?  @map("avatar_url")
+  interests       String[] // Array of True Crime categories
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Privacy settings stored as JSON
+  privacySettings Json     @default("{\"profile_visible\": true, \"activity_visible\": true, \"allow_friend_requests\": true}") @map("privacy_settings")
+
+  // Notification preferences stored as JSON
+  notificationSettings Json @default("{\"push_enabled\": true, \"email_enabled\": true, \"new_content_alerts\": true, \"friend_activity\": true, \"weekly_digest\": true, \"cable_reminders\": true}") @map("notification_settings")
+
+  // Relations
+  userContent      UserContent[]
+  episodeProgress  EpisodeProgress[]
+  customLists      CustomList[]
+  sentFriendships  Friendship[]      @relation("RequesterFriendship")
+  receivedFriendships Friendship[]   @relation("AddresseeFriendship")
+  socialActivities SocialActivity[]
+  notifications    Notification[]
+  challengeParticipants ChallengeParticipant[]
+  achievements     UserAchievement[]
+
+  @@map("user_profiles")
+}
+
+// Content metadata (aggregated from external APIs)
+model Content {
+  id             String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  externalId     String    @map("external_id") @db.VarChar(100)
+  title          String    @db.VarChar(255)
+  description    String?
+  contentType    ContentType @map("content_type")
+  genreTags      String[]  @map("genre_tags") // Array of genre tags
+  caseTags       String[]  @map("case_tags") // Array of criminal case identifiers
+  releaseDate    DateTime? @map("release_date") @db.Date
+  runtimeMinutes Int?      @map("runtime_minutes")
+  posterUrl      String?   @map("poster_url")
+  trailerUrl     String?   @map("trailer_url")
+
+  // Platform availability stored as JSON array
+  platforms      Json      @default("[]") // Array of platform objects with availability dates
+
+  // TMDb and other external metadata
+  tmdbId         Int?      @map("tmdb_id")
+  imdbId         String?   @map("imdb_id") @db.VarChar(20)
+  tvdbId         Int?      @map("tvdb_id")
+
+  // TV Series specific fields
+  totalSeasons   Int?      @map("total_seasons")
+  totalEpisodes  Int?      @map("total_episodes")
+  status         String?   @db.VarChar(50) // "ended", "returning", "in_production"
+
+  // Search optimization
+  searchVector   String?   @map("search_vector") // Full-text search vector
+
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  userContent    UserContent[]
+  episodeProgress EpisodeProgress[]
+  listItems      ListItem[]
+  socialActivities SocialActivity[]
+  syncJobs       SyncJob[]
+  contentCaseLinks ContentCaseLink[]
+  challengeContent ChallengeContent[]
+  challengeProgress ChallengeProgress[]
+
+  @@index([contentType])
+  @@index([caseTags])
+  @@index([releaseDate(sort: Desc)])
+  @@index([contentType, caseTags])
+  @@map("content")
+}
+
+// User content tracking
+model UserContent {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  contentId     String    @map("content_id") @db.Uuid
+  status        TrackingStatus
+
+  // User ratings and notes
+  rating        Int?      @db.SmallInt // 1-5 rating
+  notes         String?
+  tags          String[] // Personal tags
+
+  // Platform tracking
+  platformWatched String? @map("platform_watched") @db.VarChar(100)
+
+  // Date tracking
+  dateAdded     DateTime  @default(now()) @map("date_added") @db.Timestamptz
+  dateStarted   DateTime? @map("date_started") @db.Timestamptz
+  dateCompleted DateTime? @map("date_completed") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  userProfile   UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  content       Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentId])
+  @@index([userId, status])
+  @@index([updatedAt(sort: Desc)])
+  @@map("user_content")
+}
+
+// Episode progress tracking for TV series
+model EpisodeProgress {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  contentId     String    @map("content_id") @db.Uuid
+  seasonNumber  Int       @map("season_number")
+  episodeNumber Int       @map("episode_number")
+  watched       Boolean   @default(false)
+  watchedAt     DateTime? @map("watched_at") @db.Timestamptz
+
+  // Relations
+  userProfile   UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  content       Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentId, seasonNumber, episodeNumber])
+  @@index([userId, contentId])
+  @@map("episode_progress")
+}
+
+// Custom user lists
+model CustomList {
+  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  title       String      @db.VarChar(100)
+  description String?
+  privacy     ListPrivacy @default(PRIVATE)
+
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  userProfile UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  listItems   ListItem[]
+  socialActivities SocialActivity[]
+
+  @@index([userId, privacy])
+  @@map("custom_lists")
+}
+
+// List items (many-to-many between lists and content)
+model ListItem {
+  id         String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  listId     String     @map("list_id") @db.Uuid
+  contentId  String     @map("content_id") @db.Uuid
+  orderIndex Int        @map("order_index")
+  notes      String?    // Item-specific notes
+
+  // Relations
+  customList CustomList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  content    Content    @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, contentId])
+  @@unique([listId, orderIndex])
+  @@map("list_items")
+}
+
+// Friend relationships
+model Friendship {
+  id           String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  requesterId  String           @map("requester_id") @db.Uuid
+  addresseeId  String           @map("addressee_id") @db.Uuid
+  status       FriendshipStatus @default(PENDING)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  requester    UserProfile      @relation("RequesterFriendship", fields: [requesterId], references: [userId], onDelete: Cascade)
+  addressee    UserProfile      @relation("AddresseeFriendship", fields: [addresseeId], references: [userId], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([status])
+  @@map("friendships")
+}
+
+// Social activity feed
+model SocialActivity {
+  id           String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String      @map("user_id") @db.Uuid
+  activityType String      @map("activity_type") @db.VarChar(50)
+  contentId    String?     @map("content_id") @db.Uuid
+  listId       String?     @map("list_id") @db.Uuid
+  activityData Json?       @map("activity_data") // Additional activity context
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  userProfile  UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  content      Content?    @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  customList   CustomList? @relation(fields: [listId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("social_activities")
+}
+
+// Notifications
+model Notification {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(50) // "new_content", "friend_activity", "system"
+  title     String    @db.VarChar(255)
+  message   String
+  data      Json?     // Additional notification data
+  read      Boolean   @default(false)
+  sentAt    DateTime  @default(now()) @map("sent_at") @db.Timestamptz
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+
+  // Relations
+  userProfile UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, read, sentAt(sort: Desc)])
+  @@map("notifications")
+}
+
+// External API synchronization tracking
+model SyncJob {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  jobType       String    @map("job_type") @db.VarChar(50)
+  contentId     String?   @map("content_id") @db.Uuid
+  status        SyncStatus
+  startedAt     DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz
+  errorMessage  String?   @map("error_message")
+  retryCount    Int       @default(0) @map("retry_count")
+  nextRetryAt   DateTime? @map("next_retry_at") @db.Timestamptz
+
+  // Relations
+  content       Content?  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([status, jobType])
+  @@map("sync_jobs")
+}
+
+// Content cases (criminal cases metadata)
+model ContentCase {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  caseName    String    @unique @map("case_name") @db.VarChar(255)
+  caseSlug    String    @unique @map("case_slug") @db.VarChar(255) // URL-friendly identifier
+  description String?
+  perpetrators String[] // Names of perpetrators
+  victims     String[] // Names of victims
+  locations   String[] // Geographic locations
+  timePeriod  String?   @map("time_period") @db.VarChar(50) // e.g., "1970s-1980s"
+  caseStatus  CaseStatus @map("case_status")
+  wikipediaUrl String?  @map("wikipedia_url")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  contentCaseLinks ContentCaseLink[]
+
+  @@map("content_cases")
+}
+
+// Many-to-many relationship between content and cases
+model ContentCaseLink {
+  contentId String @map("content_id") @db.Uuid
+  caseId    String @map("case_id") @db.Uuid
+
+  // Relations
+  content     Content     @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  contentCase ContentCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, caseId])
+  @@map("content_case_links")
+}
+
+// Community challenges and events
+model Challenge {
+  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title       String      @db.VarChar(255)
+  description String?
+  challengeType ChallengeType @map("challenge_type")
+  status      ChallengeStatus @default(UPCOMING)
+
+  // Date range for the challenge
+  startDate   DateTime    @map("start_date") @db.Timestamptz
+  endDate     DateTime    @map("end_date") @db.Timestamptz
+
+  // Challenge configuration
+  targetCount Int?        @map("target_count") // Number of items to complete
+  rules       Json?       // Challenge-specific rules and requirements
+  rewards     Json?       // Badge/achievement definitions
+
+  // Metadata
+  createdBy   String?     @map("created_by") @db.Uuid // Admin or system created
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  participants ChallengeParticipant[]
+  challengeContent ChallengeContent[]
+
+  @@index([status, startDate])
+  @@index([challengeType, startDate])
+  @@map("challenges")
+}
+
+// Challenge content (what content is included in each challenge)
+model ChallengeContent {
+  challengeId String @map("challenge_id") @db.Uuid
+  contentId   String @map("content_id") @db.Uuid
+  isRequired  Boolean @default(false) @map("is_required") // Required vs. optional content
+  points      Int?    // Points awarded for completing this content
+
+  // Relations
+  challenge Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  content   Content   @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@id([challengeId, contentId])
+  @@map("challenge_content")
+}
+
+// User participation in challenges
+model ChallengeParticipant {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  challengeId String    @map("challenge_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  status      ParticipantStatus @default(JOINED)
+
+  // Progress tracking
+  completedCount Int     @default(0) @map("completed_count")
+  totalPoints    Int     @default(0) @map("total_points")
+
+  // Completion tracking
+  joinedAt     DateTime  @default(now()) @map("joined_at") @db.Timestamptz
+  completedAt  DateTime? @map("completed_at") @db.Timestamptz
+
+  // Relations
+  challenge   Challenge   @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+  userProfile UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  progress    ChallengeProgress[]
+
+  @@unique([challengeId, userId])
+  @@index([userId, status])
+  @@map("challenge_participants")
+}
+
+// Individual content progress within challenges
+model ChallengeProgress {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  participantId String    @map("participant_id") @db.Uuid
+  contentId     String    @map("content_id") @db.Uuid
+  completed     Boolean   @default(false)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz
+  points        Int       @default(0)
+
+  // Relations
+  participant ChallengeParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  content     Content              @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([participantId, contentId])
+  @@map("challenge_progress")
+}
+
+// User achievements and badges
+model UserAchievement {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  achievementType AchievementType @map("achievement_type")
+  achievementData Json     @map("achievement_data") // Badge metadata, challenge info, etc.
+  earnedAt     DateTime  @default(now()) @map("earned_at") @db.Timestamptz
+
+  // Relations
+  userProfile UserProfile @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, achievementType])
+  @@index([earnedAt(sort: Desc)])
+  @@map("user_achievements")
+}
+
+// Enums
+enum ContentType {
+  MOVIE      @map("movie")
+  TV_SERIES  @map("tv_series")
+  DOCUMENTARY @map("documentary")
+  PODCAST    @map("podcast")
+
+  @@map("content_type")
+}
+
+enum TrackingStatus {
+  WANT_TO_WATCH @map("want_to_watch")
+  WATCHING      @map("watching")
+  COMPLETED     @map("completed")
+  ABANDONED     @map("abandoned")
+
+  @@map("tracking_status")
+}
+
+enum ListPrivacy {
+  PRIVATE @map("private")
+  FRIENDS @map("friends")
+  PUBLIC  @map("public")
+
+  @@map("list_privacy")
+}
+
+enum FriendshipStatus {
+  PENDING  @map("pending")
+  ACCEPTED @map("accepted")
+  BLOCKED  @map("blocked")
+
+  @@map("friendship_status")
+}
+
+enum SyncStatus {
+  PENDING   @map("pending")
+  RUNNING   @map("running")
+  COMPLETED @map("completed")
+  FAILED    @map("failed")
+
+  @@map("sync_status")
+}
+
+enum CaseStatus {
+  SOLVED   @map("solved")
+  UNSOLVED @map("unsolved")
+  COLD     @map("cold")
+
+  @@map("case_status")
+}
+
+enum ChallengeType {
+  VIEWING_CHALLENGE @map("viewing_challenge")
+  RESEARCH_PROJECT  @map("research_project")
+  CONTENT_MARATHON  @map("content_marathon")
+  CASE_DEEP_DIVE    @map("case_deep_dive")
+  SEASONAL_EVENT    @map("seasonal_event")
+
+  @@map("challenge_type")
+}
+
+enum ChallengeStatus {
+  UPCOMING   @map("upcoming")
+  ACTIVE     @map("active")
+  COMPLETED  @map("completed")
+  CANCELLED  @map("cancelled")
+
+  @@map("challenge_status")
+}
+
+enum ParticipantStatus {
+  JOINED     @map("joined")
+  ACTIVE     @map("active")
+  COMPLETED  @map("completed")
+  WITHDRAWN  @map("withdrawn")
+
+  @@map("participant_status")
+}
+
+enum AchievementType {
+  CHALLENGE_COMPLETED @map("challenge_completed")
+  STREAK_ACHIEVED     @map("streak_achieved")
+  CONTENT_MILESTONE   @map("content_milestone")
+  SOCIAL_MILESTONE    @map("social_milestone")
+  RESEARCH_BADGE      @map("research_badge")
+  COMMUNITY_AWARD     @map("community_award")
+
+  @@map("achievement_type")
+}

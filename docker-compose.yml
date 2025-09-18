@@ -1,0 +1,142 @@
+version: '3.8'
+
+name: tcwatch
+
+services:
+  # Redis for Caching and Session Storage
+  redis:
+    image: redis:7-alpine
+    container_name: tcwatch-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-dev_redis_123}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - tcwatch-network
+
+  # Meilisearch for Content Search
+  meilisearch:
+    image: getmeili/meilisearch:v1.4
+    container_name: tcwatch-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY:-dev_meili_master_key_123}
+      MEILI_ENV: development
+      MEILI_HTTP_ADDR: 0.0.0.0:7700
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tcwatch-network
+
+  # TCWatch Backend Application
+  backend:
+    build:
+      context: ./TC-Backend
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: tcwatch-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: ${SUPABASE_DATABASE_URL}
+      REDIS_URL: redis://default:${REDIS_PASSWORD:-dev_redis_123}@redis:6379
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILISEARCH_MASTER_KEY:-dev_meili_master_key_123}
+      TEMPORAL_SERVER_URL: ${TEMPORAL_CLOUD_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_super_long_and_secure_123}
+      WATCHMODE_API_KEY: ${WATCHMODE_API_KEY}
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      THETVDB_API_KEY: ${THETVDB_API_KEY}
+      TVMAZE_API_KEY: ${TVMAZE_API_KEY}
+      SENTRY_DSN: ${SENTRY_DSN}
+      SENTRY_DEVELOPMENT: ${SENTRY_DEVELOPMENT:-false}
+      APP_VERSION: ${APP_VERSION:-dev}
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Debug port
+    volumes:
+      - ./TC-Backend/src:/app/src
+      - ./TC-Backend/package.json:/app/package.json
+      - ./TC-Backend/package-lock.json:/app/package-lock.json
+      - ./TC-Backend/tsconfig.json:/app/tsconfig.json
+      - ./TC-Backend/nodemon.json:/app/nodemon.json
+      - /app/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - tcwatch-network
+
+  # Nginx Reverse Proxy (API Gateway)
+  nginx:
+    image: nginx:alpine
+    container_name: tcwatch-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./TC-Backend/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./TC-Backend/docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./TC-Backend/docker/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - tcwatch-network
+
+  # Development Tools (disabled in production)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tcwatch-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-dev_redis_123}
+      HTTP_USER: admin
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin123}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - tools
+    networks:
+      - tcwatch-network
+
+volumes:
+  redis_data:
+    driver: local
+  meilisearch_data:
+    driver: local
+
+networks:
+  tcwatch-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

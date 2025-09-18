@@ -1,0 +1,268 @@
+name: 📱 Mobile Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'TC-Frontend/**'
+      - 'packages/**'
+      - '.github/workflows/mobile-test.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'TC-Frontend/**'
+      - 'packages/**'
+      - '.github/workflows/mobile-test.yml'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # Mobile Unit Tests
+  mobile-unit-tests:
+    name: 📱 Mobile Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run mobile unit tests
+        working-directory: TC-Frontend
+        run: npm run test:ci
+
+      - name: 📊 Upload mobile test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: TC-Frontend/coverage/lcov.info
+          flags: mobile
+          name: mobile-coverage
+
+  # Android Tests (if using Detox)
+  android-e2e:
+    name: 🤖 Android E2E Tests
+    runs-on: ubuntu-latest
+    if: false # Enable when Detox is configured
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Setup Detox
+        working-directory: TC-Frontend
+        run: |
+          npm install -g detox-cli
+          detox build --configuration android.emu.debug
+
+      - name: 🤖 Start Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: Nexus 6
+          script: |
+            cd TC-Frontend
+            detox test --configuration android.emu.debug --headless
+
+      - name: 📊 Upload Android test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: android-test-results
+          path: TC-Frontend/e2e/artifacts/
+          retention-days: 30
+
+  # iOS Tests (macOS runner required)
+  ios-e2e:
+    name: 🍎 iOS E2E Tests
+    runs-on: macos-latest
+    if: false # Enable when Detox is configured and iOS testing is needed
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 🍎 Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_15.0.app/Contents/Developer
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🍎 Install iOS dependencies
+        working-directory: TC-Frontend
+        run: npx pod-install
+
+      - name: 🔧 Setup Detox
+        working-directory: TC-Frontend
+        run: |
+          npm install -g detox-cli
+          detox build --configuration ios.sim.debug
+
+      - name: 🍎 Run iOS E2E tests
+        working-directory: TC-Frontend
+        run: detox test --configuration ios.sim.debug
+
+      - name: 📊 Upload iOS test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: ios-test-results
+          path: TC-Frontend/e2e/artifacts/
+          retention-days: 30
+
+  # Metro Bundle Analysis
+  bundle-analysis:
+    name: 📦 Bundle Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 📦 Analyze bundle size
+        working-directory: TC-Frontend
+        run: |
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file index.js \
+            --bundle-output android-bundle.js \
+            --reset-cache
+
+          echo "## 📦 Bundle Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "Bundle size: $(wc -c < android-bundle.js) bytes" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📊 Upload bundle analysis
+        uses: actions/upload-artifact@v3
+        with:
+          name: bundle-analysis
+          path: TC-Frontend/android-bundle.js
+          retention-days: 30
+
+  # Expo Compatibility Check
+  expo-check:
+    name: 🔧 Expo Compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔧 Check Expo doctor
+        working-directory: TC-Frontend
+        run: npx expo doctor
+
+      - name: 🔧 Validate app config
+        working-directory: TC-Frontend
+        run: npx expo config --type public
+
+  # Mobile Performance Tests
+  mobile-performance:
+    name: ⚡ Mobile Performance
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: ⚡ Run performance tests
+        working-directory: TC-Frontend
+        run: |
+          echo "## ⚡ Mobile Performance" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          # Bundle size check
+          BUNDLE_SIZE=$(npm run build 2>&1 | grep -o '[0-9.]*MB' | head -1 || echo "Unknown")
+          echo "| Bundle Size | $BUNDLE_SIZE |" >> $GITHUB_STEP_SUMMARY
+
+          # Dependency count
+          DEP_COUNT=$(npm list --depth=0 2>/dev/null | grep -c "├──\|└──" || echo "Unknown")
+          echo "| Dependencies | $DEP_COUNT |" >> $GITHUB_STEP_SUMMARY
+
+          # TypeScript compilation time
+          TS_START=$(date +%s)
+          npm run type-check
+          TS_END=$(date +%s)
+          TS_TIME=$((TS_END - TS_START))
+          echo "| TypeScript Check | ${TS_TIME}s |" >> $GITHUB_STEP_SUMMARY
+
+  # Mobile Test Summary
+  mobile-test-summary:
+    name: 📊 Mobile Test Summary
+    runs-on: ubuntu-latest
+    needs: [mobile-unit-tests, bundle-analysis, expo-check, mobile-performance]
+    if: always()
+
+    steps:
+      - name: 📊 Generate mobile test summary
+        run: |
+          echo "## 📱 Mobile Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | ${{ needs.mobile-unit-tests.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Bundle Analysis | ${{ needs.bundle-analysis.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Expo Check | ${{ needs.expo-check.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance | ${{ needs.mobile-performance.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY

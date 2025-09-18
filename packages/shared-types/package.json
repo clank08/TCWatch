@@ -1,0 +1,55 @@
+{
+  "name": "@tcwatch/shared-types",
+  "version": "1.0.0",
+  "description": "Shared TypeScript types for TCWatch",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "import": "./dist/api/index.js"
+    },
+    "./database": {
+      "types": "./dist/database/index.d.ts",
+      "import": "./dist/database/index.js"
+    },
+    "./external": {
+      "types": "./dist/external/index.d.ts",
+      "import": "./dist/external/index.js"
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  },
+  "peerDependencies": {
+    "zod": "^3.22.4"
+  },
+  "keywords": [
+    "tcwatch",
+    "types",
+    "typescript",
+    "shared"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/tcwatch.git",
+    "directory": "packages/shared-types"
+  },
+  "author": "TCWatch Team",
+  "license": "MIT"
+}

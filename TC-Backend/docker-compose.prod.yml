@@ -1,0 +1,96 @@
+version: '3.8'
+
+# Production Docker Compose Override
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+name: tcwatch-prod
+
+services:
+  # Production backend with optimized settings
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    environment:
+      NODE_ENV: production
+      # Override development settings
+      LOG_LEVEL: warn
+      DEBUG_ENABLED: false
+    # Remove debug port
+    ports:
+      - "3000:3000"
+    # Remove volume mounts for hot-reloading
+    volumes: []
+    restart: always
+
+  # Production PostgreSQL with optimized settings
+  postgres:
+    environment:
+      POSTGRES_SHARED_PRELOAD_LIBRARIES: pg_stat_statements
+      POSTGRES_LOG_STATEMENT: none
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: 1000
+    command: >
+      postgres
+      -c max_connections=100
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+    restart: always
+
+  # Production Redis with persistence
+  redis:
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    restart: always
+
+  # Production Meilisearch
+  meilisearch:
+    environment:
+      MEILI_ENV: production
+      MEILI_NO_ANALYTICS: true
+      MEILI_DUMP_DIR: /meili_data/dumps
+    restart: always
+
+  # Production Temporal
+  temporal-server:
+    restart: always
+
+  temporal-postgresql:
+    restart: always
+
+  # Production Nginx with SSL
+  nginx:
+    environment:
+      NGINX_WORKER_PROCESSES: auto
+      NGINX_WORKER_CONNECTIONS: 1024
+    restart: always
+
+  # Remove development tools in production
+  redis-commander:
+    profiles:
+      - disabled
+
+  adminer:
+    profiles:
+      - disabled
+
+  temporal-web:
+    profiles:
+      - disabled

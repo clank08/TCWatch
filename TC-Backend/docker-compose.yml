@@ -1,0 +1,149 @@
+version: '3.8'
+
+name: tcwatch-dev
+
+services:
+  # Redis for Caching and Session Storage
+  redis:
+    image: redis:7-alpine
+    container_name: tcwatch-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-dev_redis_123}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - tcwatch-network
+
+  # Meilisearch for Content Search
+  meilisearch:
+    image: getmeili/meilisearch:v1.4
+    container_name: tcwatch-meilisearch
+    restart: unless-stopped
+    environment:
+      MEILI_MASTER_KEY: ${MEILISEARCH_MASTER_KEY:-dev_meili_master_key_123}
+      MEILI_ENV: development
+      MEILI_HTTP_ADDR: 0.0.0.0:7700
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tcwatch-network
+
+  # Temporal Server for Workflow Orchestration (Using Temporal Cloud)
+  # Note: Temporal Cloud connection is configured via environment variables
+  # Local Temporal server removed - using managed Temporal Cloud service
+
+  # Temporal Web UI - Available in Temporal Cloud dashboard
+  # Local Temporal UI removed - using Temporal Cloud web interface
+
+  # Nginx Reverse Proxy (API Gateway)
+  nginx:
+    image: nginx:alpine
+    container_name: tcwatch-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+    networks:
+      - tcwatch-network
+
+  # TCWatch Backend Application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: development
+    container_name: tcwatch-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: ${SUPABASE_DATABASE_URL}
+      REDIS_URL: redis://default:${REDIS_PASSWORD:-dev_redis_123}@redis:6379
+      MEILISEARCH_HOST: http://meilisearch:7700
+      MEILISEARCH_API_KEY: ${MEILISEARCH_MASTER_KEY:-dev_meili_master_key_123}
+      TEMPORAL_SERVER_URL: ${TEMPORAL_CLOUD_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_super_long_and_secure_123}
+      WATCHMODE_API_KEY: ${WATCHMODE_API_KEY}
+      TMDB_API_KEY: ${TMDB_API_KEY}
+      THETVDB_API_KEY: ${THETVDB_API_KEY}
+      TVMAZE_API_KEY: ${TVMAZE_API_KEY}
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Debug port
+    volumes:
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./nodemon.json:/app/nodemon.json
+      - /app/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - tcwatch-network
+
+  # Redis Commander (Optional - Redis GUI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: tcwatch-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-dev_redis_123}
+      HTTP_USER: admin
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-admin123}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - tools
+    networks:
+      - tcwatch-network
+
+  # Database GUI - Use Supabase Dashboard instead of Adminer
+  # Adminer removed - using Supabase web interface for database management
+
+volumes:
+  redis_data:
+    driver: local
+  meilisearch_data:
+    driver: local
+
+networks:
+  tcwatch-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,467 @@
+name: Mobile Build & Deploy
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'TC-Frontend/**'
+      - 'packages/**'
+      - '.github/workflows/mobile-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'TC-Frontend/**'
+      - 'packages/**'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - android
+          - ios
+      profile:
+        description: 'Build profile'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - preview
+          - production
+
+env:
+  NODE_VERSION: '20'
+  EXPO_CLI_VERSION: 'latest'
+
+jobs:
+  # Check for mobile app changes
+  changes:
+    name: Detect Mobile Changes
+    runs-on: ubuntu-latest
+    outputs:
+      mobile: ${{ steps.changes.outputs.mobile }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for mobile changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            mobile:
+              - 'TC-Frontend/**'
+              - 'packages/**'
+
+  # Setup and validate mobile environment
+  setup:
+    name: Setup Mobile Environment
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    outputs:
+      expo-version: ${{ steps.expo-info.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run packages:build
+
+      - name: Get Expo app info
+        id: expo-info
+        run: |
+          cd TC-Frontend
+          echo "version=$(npx expo config --json | jq -r '.version')" >> $GITHUB_OUTPUT
+          echo "slug=$(npx expo config --json | jq -r '.slug')" >> $GITHUB_OUTPUT
+
+      - name: Validate Expo configuration
+        run: |
+          cd TC-Frontend
+          npx expo doctor
+
+  # Run mobile tests
+  test-mobile:
+    name: Test Mobile App
+    runs-on: ubuntu-latest
+    needs: [changes, setup]
+    if: needs.changes.outputs.mobile == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run packages:build
+
+      - name: Run mobile tests
+        run: npm run frontend:test
+        env:
+          CI: true
+
+      - name: Run mobile type check
+        run: |
+          cd TC-Frontend
+          npm run type-check
+
+      - name: Run mobile linting
+        run: |
+          cd TC-Frontend
+          npm run lint
+
+  # Development builds (on PR and develop branch)
+  build-development:
+    name: Build Development
+    runs-on: ubuntu-latest
+    needs: [changes, setup, test-mobile]
+    if: |
+      needs.changes.outputs.mobile == 'true' &&
+      (github.event_name == 'pull_request' ||
+       github.ref == 'refs/heads/develop' ||
+       github.event.inputs.profile == 'development')
+    strategy:
+      matrix:
+        platform: [android, ios]
+        exclude:
+          - platform: android
+            condition: ${{ github.event.inputs.platform == 'ios' }}
+          - platform: ios
+            condition: ${{ github.event.inputs.platform == 'android' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run packages:build
+
+      - name: Authenticate with Expo
+        run: |
+          cd TC-Frontend
+          npx eas login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Configure development environment
+        run: |
+          cd TC-Frontend
+          echo "EXPO_PUBLIC_API_URL=https://api-staging.tcwatch.app" > .env.local
+          echo "EXPO_PUBLIC_ENVIRONMENT=development" >> .env.local
+
+      - name: Build for ${{ matrix.platform }} (development)
+        run: |
+          cd TC-Frontend
+          npx eas build --platform ${{ matrix.platform }} --profile development --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Comment build status on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const platform = '${{ matrix.platform }}';
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `📱 Development build for ${platform} completed! Check EAS dashboard for download link.`
+            });
+
+  # Preview builds (on main branch push)
+  build-preview:
+    name: Build Preview
+    runs-on: ubuntu-latest
+    needs: [changes, setup, test-mobile]
+    if: |
+      needs.changes.outputs.mobile == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push'
+    strategy:
+      matrix:
+        platform: [android, ios]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run packages:build
+
+      - name: Authenticate with Expo
+        run: |
+          cd TC-Frontend
+          npx eas login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Configure preview environment
+        run: |
+          cd TC-Frontend
+          echo "EXPO_PUBLIC_API_URL=https://api-staging.tcwatch.app" > .env.local
+          echo "EXPO_PUBLIC_ENVIRONMENT=preview" >> .env.local
+
+      - name: Build for ${{ matrix.platform }} (preview)
+        run: |
+          cd TC-Frontend
+          npx eas build --platform ${{ matrix.platform }} --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Submit to internal testing
+        if: matrix.platform == 'android'
+        run: |
+          cd TC-Frontend
+          npx eas submit --platform android --profile preview --latest
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+
+      - name: Submit to TestFlight
+        if: matrix.platform == 'ios'
+        run: |
+          cd TC-Frontend
+          npx eas submit --platform ios --profile preview --latest
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+
+  # Production builds (manual trigger only)
+  build-production:
+    name: Build Production
+    runs-on: ubuntu-latest
+    needs: [changes, setup, test-mobile]
+    if: |
+      needs.changes.outputs.mobile == 'true' &&
+      github.event.inputs.profile == 'production' &&
+      github.ref == 'refs/heads/main'
+    environment:
+      name: mobile-production
+    strategy:
+      matrix:
+        platform: [android, ios]
+        exclude:
+          - platform: android
+            condition: ${{ github.event.inputs.platform == 'ios' }}
+          - platform: ios
+            condition: ${{ github.event.inputs.platform == 'android' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run packages:build
+
+      - name: Authenticate with Expo
+        run: |
+          cd TC-Frontend
+          npx eas login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Configure production environment
+        run: |
+          cd TC-Frontend
+          echo "EXPO_PUBLIC_API_URL=https://api.tcwatch.app" > .env.local
+          echo "EXPO_PUBLIC_ENVIRONMENT=production" >> .env.local
+
+      - name: Build for ${{ matrix.platform }} (production)
+        run: |
+          cd TC-Frontend
+          npx eas build --platform ${{ matrix.platform }} --profile production --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Submit to Google Play Store
+        if: matrix.platform == 'android'
+        run: |
+          cd TC-Frontend
+          npx eas submit --platform android --profile production --latest
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          GOOGLE_SERVICE_ACCOUNT_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY }}
+
+      - name: Submit to App Store
+        if: matrix.platform == 'ios'
+        run: |
+          cd TC-Frontend
+          npx eas submit --platform ios --profile production --latest
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+
+  # Update preview deployment
+  update-preview:
+    name: Update Preview Deployment
+    runs-on: ubuntu-latest
+    needs: [changes, setup, test-mobile]
+    if: |
+      needs.changes.outputs.mobile == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Expo CLI
+        run: npm install -g @expo/cli@${{ env.EXPO_CLI_VERSION }}
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run packages:build
+
+      - name: Authenticate with Expo
+        run: |
+          cd TC-Frontend
+          npx eas login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Configure preview environment
+        run: |
+          cd TC-Frontend
+          echo "EXPO_PUBLIC_API_URL=https://api-staging.tcwatch.app" > .env.local
+          echo "EXPO_PUBLIC_ENVIRONMENT=preview" >> .env.local
+
+      - name: Publish update
+        run: |
+          cd TC-Frontend
+          npx eas update --branch preview --message "Preview update from commit ${{ github.sha }}"
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  # Notify build status
+  notify:
+    name: Notify Build Status
+    runs-on: ubuntu-latest
+    needs: [build-development, build-preview, build-production, update-preview]
+    if: always()
+    steps:
+      - name: Notify Slack on success
+        if: success()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#mobile-builds'
+          text: '📱 TCWatch Mobile build completed successfully!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Notify Slack on failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          channel: '#mobile-builds'
+          text: '❌ TCWatch Mobile build failed!'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Cleanup old builds (runs weekly)
+  cleanup:
+    name: Cleanup Old Builds
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Authenticate with Expo
+        run: npx eas login --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Cleanup old builds
+        run: |
+          # Keep last 10 builds for each platform and profile
+          npx eas build:list --platform android --status finished --limit 50 --json | \
+            jq -r '.[10:] | .[] | .id' | \
+            xargs -I {} npx eas build:cancel {}
+
+          npx eas build:list --platform ios --status finished --limit 50 --json | \
+            jq -r '.[10:] | .[] | .id' | \
+            xargs -I {} npx eas build:cancel {}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

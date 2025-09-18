@@ -1,0 +1,40 @@
+# CODEOWNERS file for TCWatch
+# This file defines who needs to review code changes in specific areas
+
+# Global owners (for all files not covered by specific rules)
+* @kelly
+
+# Infrastructure and CI/CD
+/.github/ @kelly
+/docker/ @kelly
+/scripts/ @kelly
+docker-compose*.yml @kelly
+Dockerfile* @kelly
+*.dockerfile @kelly
+
+# Backend services
+/TC-Backend/ @kelly
+/packages/shared/ @kelly
+
+# Frontend applications
+/TC-Frontend/ @kelly
+
+# Documentation and project management
+/docs/ @kelly
+/project-documentation/ @kelly
+CLAUDE.md @kelly
+README.md @kelly
+TASKS.md @kelly
+
+# Configuration files
+.env* @kelly
+.eslintrc* @kelly
+.prettierrc* @kelly
+tsconfig*.json @kelly
+package.json @kelly
+package-lock.json @kelly
+
+# Security sensitive files
+/TC-Backend/src/auth/ @kelly
+/TC-Backend/src/middleware/security/ @kelly
+/packages/shared/src/types/auth.ts @kelly

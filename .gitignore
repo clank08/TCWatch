@@ -1,0 +1,221 @@
+# Dependencies
+node_modules/
+*/node_modules/
+.pnp
+.pnp.js
+package-lock.json
+yarn.lock
+
+# Production builds
+dist/
+build/
+*/dist/
+*/build/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+logs/
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*/coverage/
+*.lcov
+
+# Nyc test coverage
+.nyc_output
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript build info
+*.tsbuildinfo
+*/tsconfig.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+.vscode/tasks.json
+.idea
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# React Native
+# React Native CLI
+android/
+ios/
+.buckconfig
+.flowconfig
+.watchmanconfig
+
+# CocoaPods
+ios/Pods/
+ios/Podfile.lock
+
+# Android
+android/app/build/
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/index.android.map
+android/keystore.properties
+
+# Flipper
+flipper-plugin-*/
+
+# Testing
+coverage/
+.nyc_output
+
+# Jest
+jest.config.js
+
+# Prisma
+prisma/migrations/migration_lock.toml
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+docker/data/
+*.env.docker
+
+# Temporal
+.temporal/
+
+# Backup files
+*.backup
+*.bak
+
+# IDE
+*.sublime-project
+*.sublime-workspace
+
+# MacOS
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# JetBrains
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VS Code workspace files (keep the main one)
+*.code-workspace
+!TCWatch.code-workspace
+
+# Husky (install creates this)
+.husky/_
+
+# Local development
+local/
+*.local
+
+# Sentry
+.sentryclirc
+
+# Bundle analyzer
+.bundlephobia/
+
+# Webpack
+.webpack/
+
+# ESLint
+.eslintcache
+
+# Prettier
+.prettiercache
+
+# Rush
+common/deploy/
+common/temp/
+common/autoinstallers/*/.npmrc
+**/.rush/temp/
+
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Tailwind
+*.css.map

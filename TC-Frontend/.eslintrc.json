@@ -1,0 +1,54 @@
+{
+  "extends": [
+    "../.eslintrc.json",
+    "expo",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended",
+    "plugin:react-native/all"
+  ],
+  "env": {
+    "react-native/react-native": true
+  },
+  "plugins": [
+    "react",
+    "react-hooks",
+    "react-native"
+  ],
+  "settings": {
+    "react": {
+      "version": "detect"
+    }
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "react/prop-types": "off",
+    "react-native/no-unused-styles": "error",
+    "react-native/split-platform-components": "warn",
+    "react-native/no-inline-styles": "warn",
+    "react-native/no-color-literals": "warn",
+    "react-native/no-raw-text": "off",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn",
+    "@typescript-eslint/no-unused-vars": ["error", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_"
+    }]
+  },
+  "overrides": [
+    {
+      "files": ["app/**/*.tsx", "app/**/*.ts"],
+      "rules": {
+        "react-native/no-raw-text": "off"
+      }
+    },
+    {
+      "files": ["*.test.tsx", "*.spec.tsx", "**/__tests__/**/*.tsx"],
+      "env": {
+        "jest": true
+      },
+      "rules": {
+        "react-native/no-inline-styles": "off"
+      }
+    }
+  ]
+}

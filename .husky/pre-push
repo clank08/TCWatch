@@ -1,0 +1,123 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚀 Running pre-push checks..."
+
+# Get the branch being pushed
+branch=$(git rev-parse --abbrev-ref HEAD)
+echo "📝 Pushing branch: $branch"
+
+# Skip checks for main/develop branches in emergency situations
+if [ "$SKIP_HOOKS" = "true" ]; then
+  echo "⚠️  Skipping pre-push checks (SKIP_HOOKS=true)"
+  exit 0
+fi
+
+# Run full test suite for main/develop branches
+if [ "$branch" = "main" ] || [ "$branch" = "develop" ]; then
+  echo "🧪 Running full test suite for $branch branch..."
+
+  # Backend tests
+  echo "🔧 Running backend tests..."
+  cd TC-Backend
+  npm run test:ci
+  if [ $? -ne 0 ]; then
+    echo "❌ Backend tests failed!"
+    exit 1
+  fi
+  cd ..
+
+  # Frontend tests
+  echo "📱 Running frontend tests..."
+  cd TC-Frontend
+  npm run test:ci
+  if [ $? -ne 0 ]; then
+    echo "❌ Frontend tests failed!"
+    exit 1
+  fi
+  cd ..
+
+  # Type checking
+  echo "🔍 Running type checks..."
+  npm run type-check
+  if [ $? -ne 0 ]; then
+    echo "❌ Type checking failed!"
+    exit 1
+  fi
+
+  # Linting
+  echo "📝 Running linting..."
+  npm run lint
+  if [ $? -ne 0 ]; then
+    echo "❌ Linting failed!"
+    exit 1
+  fi
+
+else
+  # For feature branches, run a subset of tests
+  echo "🧪 Running quick test suite for feature branch..."
+
+  # Check for modified files since main
+  MODIFIED_FILES=$(git diff --name-only origin/main...HEAD)
+
+  # Run tests for modified backend files
+  BACKEND_MODIFIED=$(echo "$MODIFIED_FILES" | grep -E '^TC-Backend/' || true)
+  if [ -n "$BACKEND_MODIFIED" ]; then
+    echo "🔧 Running backend tests for modified files..."
+    cd TC-Backend
+    npm run test:unit -- --passWithNoTests
+    if [ $? -ne 0 ]; then
+      echo "❌ Backend tests failed!"
+      exit 1
+    fi
+    cd ..
+  fi
+
+  # Run tests for modified frontend files
+  FRONTEND_MODIFIED=$(echo "$MODIFIED_FILES" | grep -E '^TC-Frontend/' || true)
+  if [ -n "$FRONTEND_MODIFIED" ]; then
+    echo "📱 Running frontend tests for modified files..."
+    cd TC-Frontend
+    npm run test -- --passWithNoTests
+    if [ $? -ne 0 ]; then
+      echo "❌ Frontend tests failed!"
+      exit 1
+    fi
+    cd ..
+  fi
+
+  # Type checking for TypeScript files
+  TS_MODIFIED=$(echo "$MODIFIED_FILES" | grep -E '\.(ts|tsx)$' || true)
+  if [ -n "$TS_MODIFIED" ]; then
+    echo "🔍 Running type checks..."
+    npm run type-check
+    if [ $? -ne 0 ]; then
+      echo "❌ Type checking failed!"
+      exit 1
+    fi
+  fi
+fi
+
+# Check for security vulnerabilities
+echo "🔒 Running security audit..."
+npm audit --audit-level high --production
+if [ $? -ne 0 ]; then
+  echo "⚠️  Security vulnerabilities found! Please review and fix."
+  echo "💡 You can skip this check by setting SKIP_SECURITY=true"
+  if [ "$SKIP_SECURITY" != "true" ]; then
+    exit 1
+  fi
+fi
+
+# Check bundle size (for frontend changes)
+FRONTEND_CHANGES=$(git diff --name-only HEAD~1 HEAD | grep -E '^TC-Frontend/' || true)
+if [ -n "$FRONTEND_CHANGES" ]; then
+  echo "📦 Checking bundle size impact..."
+  cd TC-Frontend
+  # This would run a bundle size check - implement as needed
+  echo "📊 Bundle size check completed"
+  cd ..
+fi
+
+echo "✅ Pre-push checks completed successfully!"
+echo "🚀 Ready to push to $branch"

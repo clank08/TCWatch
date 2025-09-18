@@ -1,0 +1,204 @@
+version: 2
+updates:
+  # Root package.json
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "tcwatch-team"
+    assignees:
+      - "tcwatch-team"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automerge"
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Ignore major version updates for critical dependencies
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "fastify"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@trpc/*"
+        update-types: ["version-update:semver-major"]
+
+  # Frontend mobile app
+  - package-ecosystem: "npm"
+    directory: "/TC-Frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "tcwatch-team"
+    assignees:
+      - "tcwatch-team"
+    commit-message:
+      prefix: "deps(mobile)"
+      prefix-development: "deps-dev(mobile)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "mobile"
+      - "automerge"
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Be more conservative with mobile dependencies
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@expo/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+
+  # Backend API server
+  - package-ecosystem: "npm"
+    directory: "/TC-Backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "tcwatch-team"
+    assignees:
+      - "tcwatch-team"
+    commit-message:
+      prefix: "deps(backend)"
+      prefix-development: "deps-dev(backend)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "backend"
+      - "automerge"
+    allow:
+      - dependency-type: "direct"
+      - dependency-type: "indirect"
+    ignore:
+      # Conservative updates for backend stability
+      - dependency-name: "fastify"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@trpc/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@temporalio/*"
+        update-types: ["version-update:semver-major"]
+
+  # Shared packages
+  - package-ecosystem: "npm"
+    directory: "/packages/shared-types"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "tcwatch-team"
+    assignees:
+      - "tcwatch-team"
+    commit-message:
+      prefix: "deps(shared-types)"
+      prefix-development: "deps-dev(shared-types)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "shared-packages"
+      - "automerge"
+
+  - package-ecosystem: "npm"
+    directory: "/packages/config"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:30"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "tcwatch-team"
+    assignees:
+      - "tcwatch-team"
+    commit-message:
+      prefix: "deps(config)"
+      prefix-development: "deps-dev(config)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "shared-packages"
+      - "automerge"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "1"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "tcwatch-team"
+    assignees:
+      - "tcwatch-team"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "github-actions"
+      - "ci/cd"
+      - "automerge"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/TC-Backend"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "tcwatch-team"
+    assignees:
+      - "tcwatch-team"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "docker"
+      - "backend"
+      - "automerge"
+    ignore:
+      # Be conservative with base image updates
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "redis"
+        update-types: ["version-update:semver-major"]

@@ -1,0 +1,28 @@
+{
+  "name": "@tcwatch/e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end tests for TCWatch",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:codegen": "playwright codegen",
+    "install": "playwright install",
+    "install:deps": "playwright install-deps"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.19.17",
+    "typescript": "^5.2.2"
+  },
+  "keywords": [
+    "tcwatch",
+    "e2e",
+    "testing",
+    "playwright",
+    "automation"
+  ]
+}

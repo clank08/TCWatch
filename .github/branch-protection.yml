@@ -1,0 +1,60 @@
+# Branch Protection Rules Configuration
+# This file documents the recommended branch protection settings
+# These settings should be applied manually in GitHub repository settings
+
+branches:
+  main:
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI Pipeline Success"
+          - "Lint & Format"
+          - "Test Frontend"
+          - "Test Backend"
+          - "Build Verification"
+          - "Security Scan"
+
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        restrict_pushes_that_create_files: false
+
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
+      required_linear_history: true
+
+  develop:
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "CI Pipeline Success"
+          - "Lint & Format"
+          - "Test Frontend"
+          - "Test Backend"
+          - "Build Verification"
+
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
+
+# Manual Setup Instructions:
+# 1. Go to repository Settings > Branches
+# 2. Add branch protection rule for 'main'
+# 3. Configure settings as specified above
+# 4. Add branch protection rule for 'develop'
+# 5. Configure settings as specified above
+#
+# Note: GitHub CLI commands to set up (requires appropriate permissions):
+# gh api repos/:owner/:repo/branches/main/protection --method PUT --input protection-main.json
+# gh api repos/:owner/:repo/branches/develop/protection --method PUT --input protection-develop.json

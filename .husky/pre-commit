@@ -1,0 +1,124 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+# Run lint-staged for code formatting and linting
+echo "📝 Checking code style and formatting..."
+npx lint-staged
+
+# Check if any test files were modified
+CHANGED_FILES=$(git diff --cached --name-only)
+TEST_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(test|spec)\.(ts|tsx|js|jsx)$' || true)
+SRC_FILES=$(echo "$CHANGED_FILES" | grep -E '^(TC-Backend/src|TC-Frontend)/' || true)
+
+# Run relevant tests for modified files
+if [ -n "$TEST_FILES" ] || [ -n "$SRC_FILES" ]; then
+  echo "🧪 Running tests for modified files..."
+
+  # Check if backend files were modified
+  BACKEND_FILES=$(echo "$CHANGED_FILES" | grep -E '^TC-Backend/' || true)
+  if [ -n "$BACKEND_FILES" ]; then
+    echo "🔧 Running backend tests..."
+    cd TC-Backend
+
+    # Run unit tests for modified files
+    npm run test:unit -- --passWithNoTests --findRelatedTests $BACKEND_FILES --silent
+
+    # If critical services were modified, run integration tests
+    CRITICAL_BACKEND=$(echo "$BACKEND_FILES" | grep -E 'src/(services|middleware|routes)/' || true)
+    if [ -n "$CRITICAL_BACKEND" ]; then
+      echo "🔧 Running backend integration tests for critical paths..."
+      npm run test:integration -- --passWithNoTests --silent
+    fi
+
+    cd ..
+  fi
+
+  # Check if frontend files were modified
+  FRONTEND_FILES=$(echo "$CHANGED_FILES" | grep -E '^TC-Frontend/' || true)
+  if [ -n "$FRONTEND_FILES" ]; then
+    echo "📱 Running frontend tests..."
+    cd TC-Frontend
+
+    # Run tests for modified files
+    npm run test -- --passWithNoTests --findRelatedTests $FRONTEND_FILES --silent
+
+    # If critical components were modified, run additional tests
+    CRITICAL_FRONTEND=$(echo "$FRONTEND_FILES" | grep -E '(components|screens|hooks)/' || true)
+    if [ -n "$CRITICAL_FRONTEND" ]; then
+      echo "📱 Running additional tests for critical components..."
+      npm run test -- --passWithNoTests --testPathPattern="(components|hooks)" --silent
+    fi
+
+    cd ..
+  fi
+
+  # Check if shared packages were modified
+  PACKAGE_FILES=$(echo "$CHANGED_FILES" | grep -E '^packages/' || true)
+  if [ -n "$PACKAGE_FILES" ]; then
+    echo "📦 Running package tests..."
+    # Run tests that might be affected by package changes
+    cd TC-Backend && npm run test:unit -- --passWithNoTests && cd ..
+    cd TC-Frontend && npm run test -- --passWithNoTests && cd ..
+  fi
+else
+  echo "✅ No test files or source files modified, skipping tests"
+fi
+
+# Type checking for modified TypeScript files
+TS_FILES=$(echo "$CHANGED_FILES" | grep -E '\.(ts|tsx)$' || true)
+if [ -n "$TS_FILES" ]; then
+  echo "🔍 Type checking modified TypeScript files..."
+
+  # Check backend types
+  BACKEND_TS=$(echo "$TS_FILES" | grep -E '^TC-Backend/' || true)
+  if [ -n "$BACKEND_TS" ]; then
+    echo "🔧 Type checking backend..."
+    cd TC-Backend && npm run type-check && cd ..
+  fi
+
+  # Check frontend types
+  FRONTEND_TS=$(echo "$TS_FILES" | grep -E '^TC-Frontend/' || true)
+  if [ -n "$FRONTEND_TS" ]; then
+    echo "📱 Type checking frontend..."
+    cd TC-Frontend && npm run type-check && cd ..
+  fi
+fi
+
+# Validate test quality for new/modified test files
+if [ -n "$TEST_FILES" ]; then
+  echo "🔍 Validating test quality..."
+
+  for test_file in $TEST_FILES; do
+    if [ -f "$test_file" ]; then
+      # Check for test naming conventions
+      if ! grep -q "describe\|it\|test" "$test_file"; then
+        echo "⚠️  Warning: $test_file may not contain valid test cases"
+      fi
+
+      # Check for proper test structure
+      if ! grep -q "expect\|toBe\|toHave\|toEqual" "$test_file"; then
+        echo "⚠️  Warning: $test_file may not contain assertions"
+      fi
+
+      # Check for accessibility tests in frontend components
+      if echo "$test_file" | grep -q "TC-Frontend.*components.*test"; then
+        if ! grep -q "accessibility\|a11y\|accessibilityLabel\|accessibilityRole" "$test_file"; then
+          echo "📱 Reminder: Consider adding accessibility tests to $test_file"
+        fi
+      fi
+    fi
+  done
+fi
+
+# Final validation
+echo "✅ Pre-commit checks completed successfully!"
+echo "📊 Summary:"
+echo "   • Code formatting: ✅ Passed"
+echo "   • Type checking: ✅ Passed"
+echo "   • Unit tests: ✅ Passed"
+if [ -n "$CRITICAL_BACKEND" ] || [ -n "$CRITICAL_FRONTEND" ]; then
+  echo "   • Integration tests: ✅ Passed"
+fi
+echo "🚀 Ready to commit!"

@@ -1,0 +1,109 @@
+{
+  "name": "tcwatch-monorepo",
+  "version": "1.0.0",
+  "description": "TCWatch - True Crime Tracker Monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "TC-Frontend",
+    "TC-Backend",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "clean": "node scripts/clean-all.js",
+    "fresh": "npm run clean && npm install",
+    "setup": "bash scripts/dev-setup.sh --full",
+    "postinstall": "husky install",
+    "frontend:dev": "npm run dev --workspace=tcwatch-frontend",
+    "frontend:build": "npm run build --workspace=tcwatch-frontend",
+    "frontend:android": "npm run android --workspace=tcwatch-frontend",
+    "frontend:ios": "npm run ios --workspace=tcwatch-frontend",
+    "frontend:web": "npm run web --workspace=tcwatch-frontend",
+    "frontend:test": "npm run test --workspace=tcwatch-frontend",
+    "backend:dev": "npm run dev --workspace=tcwatch-backend",
+    "backend:build": "npm run build --workspace=tcwatch-backend",
+    "backend:docker:dev": "npm run docker:dev --workspace=tcwatch-backend",
+    "backend:docker:down": "npm run docker:dev:down --workspace=tcwatch-backend",
+    "backend:test": "npm run test --workspace=tcwatch-backend",
+    "backend:setup": "npm run setup --workspace=tcwatch-backend",
+    "packages:build": "node scripts/build-packages.js",
+    "packages:clean": "npm run clean --workspace=@tcwatch/shared-types && npm run clean --workspace=@tcwatch/config",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:build": "docker-compose build",
+    "docker:logs": "docker-compose logs -f",
+    "docker:restart": "docker-compose restart",
+    "monitoring:start": "bash scripts/monitoring/start-monitoring.sh start",
+    "monitoring:stop": "bash scripts/monitoring/start-monitoring.sh stop",
+    "monitoring:status": "bash scripts/monitoring/start-monitoring.sh status",
+    "monitoring:logs": "bash scripts/monitoring/start-monitoring.sh logs",
+    "health:check": "bash scripts/health-checks/system-health.sh",
+    "deploy:staging:vercel": "bash scripts/deployment/deploy.sh staging vercel",
+    "deploy:staging:docker": "bash scripts/deployment/deploy.sh staging docker",
+    "deploy:production:vercel": "bash scripts/deployment/deploy.sh production vercel",
+    "deploy:production:docker": "bash scripts/deployment/deploy.sh production docker",
+    "deploy:mobile:staging": "bash scripts/deployment/deploy.sh staging eas",
+    "deploy:mobile:production": "bash scripts/deployment/deploy.sh production eas"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.3",
+    "@commitlint/config-conventional": "^18.4.3",
+    "@typescript-eslint/eslint-plugin": "^6.12.0",
+    "@typescript-eslint/parser": "^6.12.0",
+    "eslint": "^8.54.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "eslint-plugin-react": "^7.33.2",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-native": "^4.1.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.0",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/tcwatch.git"
+  },
+  "author": "TCWatch Team",
+  "license": "MIT",
+  "keywords": [
+    "tcwatch",
+    "true-crime",
+    "streaming",
+    "monorepo",
+    "react-native",
+    "expo",
+    "fastify",
+    "typescript"
+  ],
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ],
+    "**/*.test.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*.spec.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
